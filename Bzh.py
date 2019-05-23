@@ -1,8 +1,10 @@
 import csv
 import json
+import os
 import re
 import time
 
+import pandas
 import pymongo
 import pymysql
 import requests
@@ -24,7 +26,7 @@ class Bzi(object):
         response=requests.get(url=url,headers=self.headers)
         return response
 
-    def parse_page(self,response):  #解析详细页面
+    def parse_page(self,response):  #解析详细页面url
         html=pq(response.text)
         result=html.find('#main > div > div.job-list > ul li').items()
         items=[]
@@ -37,7 +39,6 @@ class Bzi(object):
         for url in info_url:
             response=self.response_headler(url)
             data=self.parse_info_parse(response)
-            print(data)
             self.sava_data(data,position)
             time.sleep(3)
 
@@ -53,16 +54,17 @@ class Bzi(object):
         }
 
     def sava_data(self,data,position):  #保存数据
+        print('sava_data...',data)
         headers=['company_name','city','demand','work_name','money','position_details']
-        with open('{position}.txt'.format(position=position),'a',encoding='UTF-8') as f:
+        with open('{position}.txt'.format(position=position),'a',encoding='utf-8') as f:
             f.write(json.dumps(data,ensure_ascii=False)+'\n')
-            f.close()
+            print('sava text_file succeed')
 
-        with open('{position}.csv'.format(position=position),'a',encoding='UTF-8') as f:
-            f_csv=csv.DictWriter(f,headers)
-            f_csv.writeheader()
-            f_csv.writerow(data)
-            f.close()
+        with open('{position}.csv'.format(position=position),'a',encoding='utf_8_sig',newline='') as fp:
+            self.f_csv=csv.DictWriter(fp,headers)
+            self.f_csv.writerow(data)
+            print('sava csv_file succeed')
+        print('sava_over')
 
 
     def next_page(self,response,position):  #获取下一页链接
@@ -73,7 +75,8 @@ class Bzi(object):
 
 
 
-    def position_code(self):
+    def position_code(self): #crawl positioninfo code
+        print('爬取职位信息')
         url='https://www.zhipin.com/wapi/zpCommon/data/position.json'
         response=self.response_headler(url)
         datas=json.loads(response.text, encoding=False)
@@ -86,17 +89,20 @@ class Bzi(object):
                     items['category_position']=sub.get('name')
                     items['category_code']=sub.get('code')
                     item.append(items)
+        print('爬取职位信息成功',item)
         return item
 
     def main(self,url,position):  #翻页爬取
+        print('翻页成功...','开始爬取')
         response=self.response_headler(url)
         try:
             info_url = self.parse_page(response)
             self.crawl_info(info_url,position)
         except:
-            info_url = self.parse_page(response)
-            self.crawl_info(info_url,position)
-        self.next_page(response)
+            print('解析失败，重新解析本页面')
+            self.main(url,position)
+        self.next_page(response,position)
+        print('页面爬取成功，开始新一页爬取')
 
     def crawl_main(self,url,position):  #first爬取
         response = self.response_headler(url)
@@ -104,20 +110,21 @@ class Bzi(object):
             info_url = self.parse_page(response)
             self.crawl_info(info_url,position)
         except:
-            print('解析失败，重新解析')
-            info_url = self.parse_page(response)
-            self.crawl_info(info_url,position)
+            print('解析失败，重新解析本页面')
+            self.crawl_main(url,position)
         else:
             print('爬取成功')
+        print('准备翻页爬取...')
         self.next_page(response,position)
 
     def crawl_total(self): #主程序
         url = 'https://www.zhipin.com/c101010100-p{code}/?page=1&ka=page-next'
+        print('start_crawl...',url)
         for data in self.code:
             main_code=data.get('category_code')
             main_name=data.get('position')
             self.crawl_main(url.format(code=main_code),main_name)
-
+        print('crawl...over')
 
 if __name__ == '__main__':
     c=Bzi()
