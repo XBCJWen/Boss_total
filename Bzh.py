@@ -28,7 +28,8 @@ class Bzi(object):
             response=requests.get(url=url,headers=self.headers)
         except:
             self.response_headler(url)
-        return response
+        else:
+            return response
 
     def parse_page(self,response):  #解析详细页面url
         html=pq(response.text)
@@ -44,7 +45,7 @@ class Bzi(object):
             response=self.response_headler(url)
             data=self.parse_info_parse(response)
             self.sava_data(data,position)
-            time.sleep(3)
+            time.sleep(5)
 
     def parse_info_parse(self,response): #解析页面详细信息
         html=pq(response.text)
@@ -79,6 +80,8 @@ class Bzi(object):
                 self.main(next,position)
         except:
             self.next_page(response,position)
+        else:
+            print('获取下一页成功')
 
 
 
@@ -108,8 +111,9 @@ class Bzi(object):
         except:
             print('解析失败，重新解析本页面')
             self.main(url,position)
-        self.next_page(response,position)
-        print('页面爬取成功，开始新一页爬取')
+        else:
+            self.next_page(response,position)
+            print('页面爬取成功，开始新一页爬取')
 
     def crawl_main(self,url,position):  #first爬取
         print('first_crawl')
@@ -120,10 +124,11 @@ class Bzi(object):
         except:
             print('解析失败，重新解析本页面')
             self.crawl_main(url,position)
+
         else:
             print('爬取成功')
-        print('准备翻页爬取...')
-        self.next_page(response,position)
+            print('准备翻页爬取...')
+            self.next_page(response,position)
 
     def crawl_total(self): #主程序
         url = 'https://www.zhipin.com/c101010100-p{code}/?page=1&ka=page-next'
