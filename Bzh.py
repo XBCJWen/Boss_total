@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import random
 import re
 import time
 
@@ -23,7 +24,10 @@ class Bzi(object):
         self.code=self.position_code()
 
     def response_headler(self,url):  #构造响应
-        response=requests.get(url=url,headers=self.headers)
+        try:
+            response=requests.get(url=url,headers=self.headers)
+        except:
+            self.response_headler(url)
         return response
 
     def parse_page(self,response):  #解析详细页面url
@@ -69,9 +73,12 @@ class Bzi(object):
 
     def next_page(self,response,position):  #获取下一页链接
         html=pq(response.text)
-        next='https://www.zhipin.com'+html('#main > div > div.job-list > div.page > a.next').attr('href')
-        if html('#main > div > div.job-list > div.page > a.next'):
-            self.main(next,position)
+        try:
+            next='https://www.zhipin.com'+html('#main > div > div.job-list > div.page > a.next').attr('href')
+            if html('#main > div > div.job-list > div.page > a.next'):
+                self.main(next,position)
+        except:
+            self.next_page(response,position)
 
 
 
@@ -89,7 +96,7 @@ class Bzi(object):
                     items['category_position']=sub.get('name')
                     items['category_code']=sub.get('code')
                     item.append(items)
-        print('爬取职位信息成功',item)
+        print('爬取职位信息成功')
         return item
 
     def main(self,url,position):  #翻页爬取
@@ -105,6 +112,7 @@ class Bzi(object):
         print('页面爬取成功，开始新一页爬取')
 
     def crawl_main(self,url,position):  #first爬取
+        print('first_crawl')
         response = self.response_headler(url)
         try:
             info_url = self.parse_page(response)
@@ -120,7 +128,9 @@ class Bzi(object):
     def crawl_total(self): #主程序
         url = 'https://www.zhipin.com/c101010100-p{code}/?page=1&ka=page-next'
         print('start_crawl...',url)
-        for data in self.code:
+        for datas in range(1,len(self.code)+1):
+            data=random.choice(self.code)
+            print(data)
             main_code=data.get('category_code')
             main_name=data.get('position')
             self.crawl_main(url.format(code=main_code),main_name)
