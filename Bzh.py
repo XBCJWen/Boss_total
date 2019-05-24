@@ -19,9 +19,10 @@ class Bzi(object):
         self.headers={
             'User-Agent':ua
         }
+        self.code=self.position_code()
+
         self.db = pymysql.connect(host='localhost', user='root', password='123456', db='spiders')
         self.cursor = self.db.cursor()
-        self.code=self.position_code()
 
     def response_headler(self,url):  #构造响应
         try:
@@ -42,13 +43,22 @@ class Bzi(object):
 
     def crawl_info(self,info_url,position):  #爬取页面详细信息
         for url in info_url:
+
             response=self.response_headler(url)
             data=self.parse_info_parse(response)
-            self.sava_data(data,position)
-            time.sleep(5)
+            print('爬取页面信息成功,开始保存')
+            try:
+                self.sava_data(data,position)
+            except:
+                print('保存失败,重新保存')
+                time.sleep(5)
+                self.crawl_info(data,position)
+            else:
+                time.sleep(5)
 
     def parse_info_parse(self,response): #解析页面详细信息
         html=pq(response.text)
+        print('解析完成')
         return {
             "company_name":html('#main > div.job-box > div > div.job-sider > div.sider-company > div > a:nth-child(1)').attr('title').strip(),
             'city': html('#main > div.job-banner > div > div > div.info-primary > p').text()[:2],
@@ -69,8 +79,24 @@ class Bzi(object):
             self.f_csv=csv.DictWriter(fp,headers)
             self.f_csv.writerow(data)
             print('sava csv_file succeed')
-        print('sava_over')
 
+        sql="insert into test(company_name, city, demand, work_name,money, position_details) VALUES ('{company_name}','{city}','{demand}','{work_name}','{money}','{position_details}')"
+        SQL=sql.format(company_name=data.get('company_name'), city=data.get('city'), demand=data.get('demand'),
+                   work_name=data.get('work_name'), money=data.get('money'),
+                   position_details=','.join(data.get('position_details')))
+        print('准备保存')
+        try:
+            print('开始保存')
+            self.cursor.execute(SQL)
+            self.db.commit()
+        except:
+            print('start_rollback')
+            self.db.rollback()
+
+
+        print('sava_mysql_scceed')
+
+        print('sava_over')
 
     def next_page(self,response,position):  #获取下一页链接
         html=pq(response.text)
@@ -122,7 +148,7 @@ class Bzi(object):
             info_url = self.parse_page(response)
             self.crawl_info(info_url,position)
         except:
-            print('解析失败，重新解析本页面')
+            print('失败，重新爬取本页面')
             self.crawl_main(url,position)
 
         else:
@@ -132,13 +158,14 @@ class Bzi(object):
 
     def crawl_total(self): #主程序
         url = 'https://www.zhipin.com/c101010100-p{code}/?page=1&ka=page-next'
-        print('start_crawl...',url)
+        print('start_crawl...')
         for datas in range(1,len(self.code)+1):
             data=random.choice(self.code)
             print(data)
             main_code=data.get('category_code')
             main_name=data.get('position')
             self.crawl_main(url.format(code=main_code),main_name)
+        self.db.close()
         print('crawl...over')
 
 if __name__ == '__main__':
