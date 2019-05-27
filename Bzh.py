@@ -26,7 +26,7 @@ class Bzi(object):
             'http:': 'http://' + ra
         }
         print('构造中...',proxies)
-        response=requests.get(url=url,headers=self.headers)
+        response=requests.get(url=url,headers=self.headers,proxies=proxies)
         print('构造完成')
         return  response
 
@@ -153,8 +153,8 @@ class Bzi(object):
     def crawl_total(self): #主程序
         url = 'https://www.zhipin.com/c101010100-p{code}/?page=1&ka=page-next'
         print('start_crawl...')
-        for datas in self.code: #datas is int
-            data=random.choice(self.code)
+        for data in self.code: #datas is int
+            # data=random.choice(self.code)
             main_code = data.get('category_code')
             print(data)
             file_name=data.get('category_position')
@@ -168,8 +168,8 @@ class Bzi(object):
                 print('文件已存在，不实行创建')
             else:
                 os.makedirs(self.file_path)
-            print('爬取的职位信息',data)
-            self.crawl_main(url.format(code=main_code),file_name)
+            # print('爬取的职位信息',data)
+            # self.crawl_main(url.format(code=main_code),file_name)
         print('crawl...over')
 
     def position_code(self): #crawl positioninfo code
