@@ -1,17 +1,13 @@
 import csv
 import json
+
 import os
 import random
-import re
 import time
-
-import pandas
-import pymongo
 import pymysql
 import requests
 from fake_useragent import UserAgent
 from pyquery import PyQuery as pq
-from requests import RequestException
 
 class Bzi(object):
 
@@ -23,25 +19,17 @@ class Bzi(object):
         self.code=self.position_code()
 
     def response_headler(self,url):  #构造响应
-        proxy = ['58.218.201.103:4112', '58.218.201.103:3283', '58.218.201.126:7557', '58.218.201.126:7637',
-                 '58.218.201.103:2645', '58.218.205.47:5239', '58.218.201.108:5294', '58.218.201.126:4083',
-                 '58.218.205.49:3990', '58.218.205.49:5725', '58.218.205.48:2338', '58.218.205.48:7183',
-                 '58.218.201.126:3903', '58.218.205.47:2989', '58.218.201.103:7108', '58.218.201.108:8319',
-                 '58.218.201.108:5119', '58.218.205.48:9458', '58.218.201.126:8840', '58.218.205.48:3473']
+        proxy = ['58.218.205.52:8586','182.101.202.124:4213']
+        ra=random.choice(proxy)
         proxies = {
-
-            'https:': 'https://' + random.choice(proxy),
-            'http:': 'https://' + random.choice(proxy)
+            'https:': 'https://' + ra,
+            'http:': 'http://' + ra
         }
-        print('构造中...')
-        try:
-            response=requests.get(url=url,headers=self.headers,proxies=proxies)
-            if response==200:
-                print('构造完成')
-                return  response
-            return  None
-        except  RequestException:
-            return None
+        print('构造中...',proxies)
+        response=requests.get(url=url,headers=self.headers)
+        print('构造完成')
+        return  response
+
 
 
     def parse_page(self,response):  #解析详细页面url
@@ -61,9 +49,7 @@ class Bzi(object):
 
     def crawl_info(self,info_url,position):  #爬取页面详细信息
         for url in info_url:
-            print('sadfasdf')
             response=self.response_headler(url)
-            print('asdfasdf',response.text)
             data=self.parse_info_parse(response)
             print('解析页面详细信息完成')
             print('爬取页面信息成功,开始保存')
@@ -93,19 +79,24 @@ class Bzi(object):
         self.db = pymysql.connect(host='localhost', user='root', password='123456', db='spiders')
         self.cursor = self.db.cursor()
         headers=['company_name','city','demand','work_name','money','position_details']
-        with open('{position}.txt'.format(position=position),'a',encoding='utf-8') as f:
+        print(self.file_path+r'\{position}.txt'.format(position=position))
+        print(self.file_path+r'\{position}.csv'.format(position=position))
+        with open(self.file_path+r'\{position}.txt'.format(position=position),'a',encoding='utf-8') as f:
             f.write(json.dumps(data,ensure_ascii=False)+'\n')
+            f.close()
             print('sava text_file succeed')
 
-        with open('{position}.csv'.format(position=position),'a',encoding='utf_8_sig',newline='') as fp:
+        with open(self.file_path+r'\{position}.csv'.format(position=position),'a',encoding='utf_8_sig',newline='') as fp:
             self.f_csv=csv.DictWriter(fp,headers)
             self.f_csv.writerow(data)
+            fp.close()
             print('sava csv_file succeed')
 
         sql="insert into test(company_name, city, demand, work_name,money, position_details) VALUES ('{company_name}','{city}','{demand}','{work_name}','{money}','{position_details}')"
         SQL=sql.format(company_name=data.get('company_name'), city=data.get('city'), demand=data.get('demand'),
                    work_name=data.get('work_name'), money=data.get('money'),
                    position_details=','.join(data.get('position_details')))
+        print(SQL)
         try:
             print('开始保存mysql')
             self.cursor.execute(SQL)
@@ -123,32 +114,19 @@ class Bzi(object):
         try:
             next='https://www.zhipin.com'+html('#main > div > div.job-list > div.page > a.next').attr('href')
             print(next)
-            if html('#main > div > div.job-list > div.page > a.next'):
+            if next!='https://www.zhipin.comjavascript:;':
                 print('开始爬取翻页信息')
                 self.main(next,position)
+            else:
+                print('已到尾页')
         except TypeError as e :
             print(e)
         else:
-            print('获取下一页成功')
+            print('获取下一页url成功')
 
-    def position_code(self): #crawl positioninfo code
-        print('爬取职位信息')
-        url='https://www.zhipin.com/wapi/zpCommon/data/position.json'
-        response=self.response_headler(url)
-        datas=json.loads(response.text, encoding=False)
-        item=[]
-        for data in datas.get('zpData'):
-            for category in data.get('subLevelModelList'):
-                for sub in category.get('subLevelModelList'):
-                    items={}
-                    items['position']=category.get('name')
-                    items['category_position']=sub.get('name')
-                    items['category_code']=sub.get('code')
-                    item.append(items)
-        print('爬取职位信息成功')
-        return item
 
-    def main(self,url,position):  #翻页爬取
+
+    def main(self,url,position):  #翻页详细信息爬取
         print('翻页成功...','开始爬取')
         response=self.response_headler(url)
         try:
@@ -168,21 +146,49 @@ class Bzi(object):
         except:
             print('失败，跳过本页面')
         else:
-            print('爬取成功')
-            print('准备翻页爬取...')
+            print('爬取页面成功')
+            print('开始准备翻页爬取...')
             self.next_page(response,position)
 
     def crawl_total(self): #主程序
         url = 'https://www.zhipin.com/c101010100-p{code}/?page=1&ka=page-next'
         print('start_crawl...')
-        for datas in range(1,len(self.code)+1): #datas is int
+        for datas in self.code: #datas is int
             data=random.choice(self.code)
-            main_code=data.get('category_code')
-            main_name=data.get('position')
-            print('爬取的职位分类信息',data)
-            self.crawl_main(url.format(code=main_code),main_name)
+            main_code = data.get('category_code')
+            print(data)
+            file_name=data.get('category_position')
+            catalogue_name=data.get('position_name')
+            totel_catalogue_name=data.get('position_totel')
+            file_dir = os.getcwd()
+            self.file_path = os.path.join(file_dir,totel_catalogue_name,catalogue_name,file_name)
+            print(self.file_path)
+            print(os.path.exists(os.path.join(self.file_path)))
+            if os.path.exists(os.path.join(self.file_path)):
+                print('文件已存在，不实行创建')
+            else:
+                os.makedirs(self.file_path)
+            print('爬取的职位信息',data)
+            self.crawl_main(url.format(code=main_code),file_name)
         print('crawl...over')
 
+    def position_code(self): #crawl positioninfo code
+        print('爬取职位信息')
+        url='https://www.zhipin.com/wapi/zpCommon/data/position.json'
+        response=self.response_headler(url)
+        datas=json.loads(response.text, encoding=False)
+        item=[]
+        for data in datas.get('zpData'):
+            for category in data.get('subLevelModelList'):
+                for sub in category.get('subLevelModelList'):
+                    items={}
+                    items['position_totel']=category['name']
+                    items['position_name']=data.get('name')
+                    items['category_position']=sub.get('name')
+                    items['category_code']=sub.get('code')
+                    item.append(items)
+        print('爬取职位信息成功')
+        return item
 if __name__ == '__main__':
     c=Bzi()
     c.crawl_total()
